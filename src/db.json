@@ -4884,7 +4884,7 @@
       "mikrotik": "r1",
       "package": "5Mbps",
       "bill": 100,
-      "balance": 0,
+      "balance": -200,
       "pppoeName": "Raju",
       "password": "raju123",
       "area": "Area-1",
@@ -4903,13 +4903,13 @@
       "district": "",
       "upazila": "",
       "comment": "",
-      "status": "Inactive",
+      "status": "Active",
       "referenceName": "",
       "referenceMobile": "",
       "autoConnection": true,
       "_id": "1771420602638-864",
       "createdAt": "2026-02-18T13:16:42.638Z",
-      "date": "2026-03-18"
+      "date": "2026-05-18"
     }
   ],
   "tickets": [
@@ -5013,14 +5013,44 @@
       ],
       "discount": 0,
       "createdAt": "2026-02-18T13:19:01.662Z"
+    },
+    {
+      "_id": "INV-481331",
+      "clientId": "1771420602638-864",
+      "clientName": "AZAZ AHMAD SWAPNIL",
+      "amount": 100,
+      "type": "Bill",
+      "billingType": "Monthly",
+      "medium": "Wallet",
+      "rechargedBy": "reseller-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-26T22:54:41.331Z"
+    },
+    {
+      "_id": "INV-632448",
+      "clientId": "1771420602638-864",
+      "clientName": "AZAZ AHMAD SWAPNIL",
+      "amount": 100,
+      "type": "Bill",
+      "billingType": "Monthly",
+      "medium": "Wallet",
+      "rechargedBy": "reseller-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-26T22:57:12.448Z"
     }
   ],
   "packages": [],
   "users": [
     {
       "_id": "admin-1",
-      "name": "Songeet Admin",
-      "phone": "01781805104",
+      "name": "Super Admin",
+      "phone": "01316124535",
       "password": "NF123456",
       "role": "Admin",
       "balance": 0,
@@ -5029,13 +5059,24 @@
     },
     {
       "_id": "reseller-1",
-      "name": "Md Arham",
-      "phone": "01700000000",
+      "name": "Area Reseller",
+      "phone": "01308730074",
       "password": "NF123456",
       "role": "Reseller",
-      "balance": 4,
+      "balance": 104,
       "status": "Active",
       "createdAt": "2026-02-20T15:54:02.892Z"
+    },
+    {
+      "name": "Azaz",
+      "phone": "01784603908",
+      "password": "NF123456",
+      "role": "Reseller",
+      "balance": 1000,
+      "status": "Active",
+      "parentId": "admin-1",
+      "_id": "1772146408672",
+      "createdAt": "2026-02-26T22:53:28.672Z"
     }
   ]
 }

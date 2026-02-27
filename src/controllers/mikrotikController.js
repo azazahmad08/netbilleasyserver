@@ -23,7 +23,8 @@ const connectRouter = async (routerData) => {
 
 exports.getAllRouters = async (req, res) => {
     try {
-        const routers = await db.findAllRouters();
+        const userId = req.headers['x-user-id'];
+        const routers = await db.findAllRouters(userId);
         res.json(routers);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -32,7 +33,8 @@ exports.getAllRouters = async (req, res) => {
 
 exports.createRouter = async (req, res) => {
     try {
-        const router = await db.createRouter(req.body);
+        const userId = req.headers['x-user-id'];
+        const router = await db.createRouter(req.body, userId);
         res.status(201).json(router);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -172,7 +174,8 @@ exports.importSecrets = async (req, res) => {
 };
 exports.getActiveUsers = async (req, res) => {
     try {
-        const routers = await db.findAllRouters();
+        const userId = req.headers['x-user-id'];
+        const routers = await db.findAllRouters(userId);
         let allActiveUsers = [];
 
         await Promise.allSettled(routers.map(async (router) => {
@@ -197,7 +200,8 @@ exports.getActiveUsers = async (req, res) => {
 
 exports.getDashboardStats = async (req, res) => {
     try {
-        const routers = await db.findAllRouters();
+        const userId = req.headers['x-user-id'];
+        const routers = await db.findAllRouters(userId);
         const clients = await db.findAllClients();
         let totalSecrets = 0;
         let activeUsers = 0;

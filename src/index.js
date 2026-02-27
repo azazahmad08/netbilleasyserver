@@ -46,6 +46,18 @@ if (process.env.USE_MONGODB === 'true') {
     console.log('Running in light-mode with local JSON database.');
 }
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(PORT, (err) => {
+    if (err) {
+        console.error('Server failed to start:', err);
+    } else {
+        console.log(`Server running on port ${PORT}`);
+    }
+});
+
+process.on('exit', (code) => {
+    console.log(`About to exit with code: ${code}`);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
 });

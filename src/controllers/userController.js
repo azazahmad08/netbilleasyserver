@@ -34,7 +34,8 @@ exports.getUserById = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const user = await db.createUser(req.body);
+        const fromId = req.headers['x-user-id'];
+        const user = await db.createUser(req.body, fromId);
         res.status(201).json(user);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -54,7 +55,8 @@ exports.updateUser = async (req, res) => {
 exports.addBalance = async (req, res) => {
     try {
         const { amount } = req.body;
-        const user = await db.addResellerBalance(req.params.id, amount);
+        const fromId = req.headers['x-user-id']; // The ID of the person adding the balance
+        const user = await db.addResellerBalance(req.params.id, amount, fromId);
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
     } catch (error) {

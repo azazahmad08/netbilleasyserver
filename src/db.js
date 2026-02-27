@@ -221,11 +221,27 @@ module.exports = {
 
 
     // Mikrotik Routers
-    findAllRouters: async () => getDb().routers || [],
-    createRouter: async (data) => {
+    findAllRouters: async (userId = null) => {
+        const db = getDb();
+        const routers = db.routers || [];
+        if (!userId) return routers;
+
+        // Find user to check role
+        const user = (db.users || []).find(u => u._id === userId);
+        if (user && user.role === 'Admin') return routers;
+
+        // Filter by owner
+        return routers.filter(r => r.ownerId === userId);
+    },
+    createRouter: async (data, ownerId = 'admin-1') => {
         const db = getDb();
         if (!db.routers) db.routers = [];
-        const newRouter = { ...data, _id: Date.now().toString(), createdAt: new Date() };
+        const newRouter = {
+            ...data,
+            _id: Date.now().toString(),
+            ownerId,
+            createdAt: new Date().toISOString()
+        };
         db.routers.push(newRouter);
         saveDb(db);
         return newRouter;
@@ -254,15 +270,30 @@ module.exports = {
     // Users (Admins/Resellers)
     findAllUsers: async () => getDb().users || [],
     findUserById: async (id) => (getDb().users || []).find(u => u._id === id),
-    createUser: async (data) => {
+    createUser: async (data, fromId = 'admin-1') => {
         const db = getDb();
         if (!db.users) db.users = [];
+
+        const initialBalance = Number(data.balance) || 0;
+
+        // If creator is not admin, deduct initial balance from their account
+        if (fromId && fromId !== 'admin-1' && initialBalance > 0) {
+            const parentIndex = db.users.findIndex(u => u._id === fromId);
+            if (parentIndex === -1) throw new Error('Creator not found');
+
+            const parentBalance = Number(db.users[parentIndex].balance || 0);
+            if (parentBalance < initialBalance) {
+                throw new Error('Insufficient balance in your wallet to set initial balance');
+            }
+            db.users[parentIndex].balance = parentBalance - initialBalance;
+        }
+
         const newUser = {
             ...data,
             _id: Date.now().toString(),
-            balance: Number(data.balance) || 0,
+            balance: initialBalance,
             role: data.role || 'Reseller',
-            createdAt: new Date()
+            createdAt: new Date().toISOString()
         };
         db.users.push(newUser);
         saveDb(db);
@@ -277,13 +308,30 @@ module.exports = {
         saveDb(db);
         return db.users[index];
     },
-    addResellerBalance: async (resellerId, amount) => {
+    addResellerBalance: async (resellerId, amount, fromId = 'admin-1') => {
         const db = getDb();
         if (!db.users) return null;
-        const index = db.users.findIndex(u => u._id === resellerId);
-        if (index === -1) return null;
-        db.users[index].balance = (Number(db.users[index].balance) || 0) + Number(amount);
+
+        const targetIndex = db.users.findIndex(u => u._id === resellerId);
+        if (targetIndex === -1) return null;
+
+        const amountNum = Number(amount);
+
+        // If fromId is not admin, deduct from their balance
+        if (fromId && fromId !== 'admin-1') {
+            const senderIndex = db.users.findIndex(u => u._id === fromId);
+            if (senderIndex === -1) throw new Error('Sender not found');
+
+            const currentSenderBalance = Number(db.users[senderIndex].balance || 0);
+            if (currentSenderBalance < amountNum) {
+                throw new Error('Insufficient balance in your wallet');
+            }
+
+            db.users[senderIndex].balance = currentSenderBalance - amountNum;
+        }
+
+        db.users[targetIndex].balance = (Number(db.users[targetIndex].balance) || 0) + amountNum;
         saveDb(db);
-        return db.users[index];
+        return db.users[targetIndex];
     }
 };
