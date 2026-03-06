@@ -4852,7 +4852,7 @@
       "mikrotik": "r1",
       "package": "10Mbps",
       "bill": 800,
-      "balance": -800,
+      "balance": -5600,
       "pppoeName": "azaz",
       "password": "azaz",
       "area": "Area-1",
@@ -4877,7 +4877,7 @@
       "autoConnection": true,
       "_id": "1771273314158-385",
       "createdAt": "2026-02-16T20:21:54.158Z",
-      "date": "2026-03-18"
+      "date": "2026-09-18"
     },
     {
       "customerId": "379",
@@ -4922,6 +4922,16 @@
       "category": "Speed",
       "_id": "101",
       "createdAt": "2024-02-05T14:48:03.000Z",
+      "comments": []
+    },
+    {
+      "clientId": "1770821879636.0073",
+      "subject": "azaz",
+      "description": "azaz",
+      "priority": "Medium",
+      "category": "Network",
+      "_id": "1772548411009",
+      "createdAt": "2026-03-03T14:33:31.009Z",
       "comments": []
     }
   ],
@@ -5043,6 +5053,96 @@
       ],
       "discount": 0,
       "createdAt": "2026-02-26T22:57:12.448Z"
+    },
+    {
+      "_id": "INV-526932",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:28:46.932Z"
+    },
+    {
+      "_id": "INV-529164",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:28:49.164Z"
+    },
+    {
+      "_id": "INV-532178",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:28:52.178Z"
+    },
+    {
+      "_id": "INV-546337",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:29:06.337Z"
+    },
+    {
+      "_id": "INV-546554",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:29:06.554Z"
+    },
+    {
+      "_id": "INV-550904",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Bill",
+      "billingType": "Daily",
+      "medium": "Wallet",
+      "rechargedBy": "admin-1",
+      "months": [
+        "January"
+      ],
+      "discount": 0,
+      "createdAt": "2026-02-28T05:29:10.904Z"
     }
   ],
   "packages": [],
@@ -5050,7 +5150,7 @@
     {
       "_id": "admin-1",
       "name": "Super Admin",
-      "phone": "01316124535",
+      "phone": "00000000000",
       "password": "NF123456",
       "role": "Admin",
       "balance": 0,
@@ -5077,6 +5177,144 @@
       "parentId": "admin-1",
       "_id": "1772146408672",
       "createdAt": "2026-02-26T22:53:28.672Z"
+    },
+    {
+      "_id": "super-admin-1",
+      "name": "Super Admin",
+      "phone": "01800000000",
+      "password": "SUPER_PASSWORD",
+      "role": "SuperAdmin",
+      "balance": 1000000,
+      "status": "Active",
+      "createdAt": "2026-02-28T09:38:32.390Z"
+    },
+    {
+      "_id": "admin-2",
+      "name": "Songeet Admin",
+      "phone": "01781805104",
+      "password": "NF123456",
+      "role": "Admin",
+      "balance": 0,
+      "status": "Active",
+      "createdAt": "2026-02-28T09:38:32.390Z"
+    },
+    {
+      "_id": "reseller-2",
+      "name": "Md Arham",
+      "phone": "01700000000",
+      "password": "NF123456",
+      "role": "Reseller",
+      "balance": 4,
+      "status": "Active",
+      "createdAt": "2026-02-28T09:38:32.390Z"
+    },
+    {
+      "name": "AZAZ AHMAD SWAPNIL",
+      "username": "azaz",
+      "password": "azaz",
+      "mobile": "0000000",
+      "nid": "",
+      "address": "Goalanda , Rajbari",
+      "email": "rootxsoftwares@gmail.com",
+      "status": "Active",
+      "permissions": [
+        "Customer Activate",
+        "Customer Edit",
+        "Customer Delete",
+        "Customer Add"
+      ],
+      "assignedAreas": [],
+      "role": "Manager",
+      "_id": "1772550681349",
+      "balance": 0,
+      "createdAt": "2026-03-03T15:11:21.349Z",
+      "clientCount": 0,
+      "parentId": "admin-1"
+    },
+    {
+      "name": "Rootx softwares",
+      "phone": "01312131415",
+      "email": "rootxsoftwares@gmail.com",
+      "address": "Goalanda , Rajbari",
+      "nid": "01312131415",
+      "website": "",
+      "password": "NB766015",
+      "role": "Reseller",
+      "balance": 0,
+      "status": "Active",
+      "parentId": "admin-1",
+      "selectedAreas": [
+        "s2"
+      ],
+      "commissionType": "Package Based",
+      "resellerShare": 40,
+      "ispOwnerShare": 60,
+      "ispOwnerShareType": "Fixed Rate",
+      "selectedProfiles": [],
+      "permissions": [
+        "Customer Delete"
+      ],
+      "_id": "1772573946082",
+      "createdAt": "2026-03-03T21:39:06.082Z"
+    },
+    {
+      "name": "AZAZ AHMAD SWAPNIL",
+      "phone": "01316124535",
+      "email": "azaz@gmail.com",
+      "address": "Goalanda , Rajbari",
+      "nid": "0000000000",
+      "website": "",
+      "password": "azaz0011",
+      "role": "Reseller",
+      "balance": 0,
+      "status": "Active",
+      "parentId": "admin-1",
+      "selectedAreas": [
+        "s1"
+      ],
+      "commissionType": "Global Commission",
+      "resellerShare": 40,
+      "ispOwnerShare": 60,
+      "ispOwnerShareType": "Fixed Rate",
+      "selectedProfiles": [],
+      "permissions": [
+        "Customer Delete",
+        "Customer Add"
+      ],
+      "_id": "1772574954742",
+      "createdAt": "2026-03-03T21:55:54.742Z"
+    }
+  ],
+  "logs": [
+    {
+      "description": "Created user: Name: Rootx softwares and Role: Reseller",
+      "module": "user",
+      "ipAddress": "::1",
+      "userName": "Super Admin",
+      "userRole": "Admin",
+      "action": "CREATE",
+      "_id": "1772573946095",
+      "createdAt": "2026-03-03T21:39:06.095Z"
+    },
+    {
+      "description": "Created user: Name: AZAZ AHMAD SWAPNIL and Role: Reseller",
+      "module": "user",
+      "ipAddress": "::1",
+      "userName": "Super Admin",
+      "userRole": "Admin",
+      "action": "CREATE",
+      "_id": "1772574954747",
+      "createdAt": "2026-03-03T21:55:54.747Z"
+    },
+    {
+      "description": "Updated user: Name: AZAZ AHMAD SWAPNIL and Role: Manager",
+      "module": "user",
+      "ipAddress": "::1",
+      "userName": "Super Admin",
+      "userRole": "Admin",
+      "action": "UPDATE",
+      "_id": "1772614334253",
+      "createdAt": "2026-03-04T08:52:14.253Z"
     }
   ]
 }
