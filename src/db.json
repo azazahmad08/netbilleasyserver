@@ -4852,7 +4852,7 @@
       "mikrotik": "r1",
       "package": "10Mbps",
       "bill": 800,
-      "balance": -5600,
+      "balance": -4800,
       "pppoeName": "azaz",
       "password": "azaz",
       "area": "Area-1",
@@ -4884,7 +4884,7 @@
       "mikrotik": "r1",
       "package": "5Mbps",
       "bill": 100,
-      "balance": -200,
+      "balance": -100,
       "pppoeName": "Raju",
       "password": "raju123",
       "area": "Area-1",
@@ -4917,12 +4917,19 @@
       "clientId": "1",
       "subject": "Internet slow",
       "description": "Getting only 2Mbps on 10Mbps package",
-      "status": "Open",
+      "status": "Done",
       "priority": "High",
       "category": "Speed",
       "_id": "101",
       "createdAt": "2024-02-05T14:48:03.000Z",
-      "comments": []
+      "comments": [
+        {
+          "text": "okay",
+          "sender": "Admin",
+          "date": "2026-03-06T13:56:34.097Z"
+        }
+      ],
+      "staff": "Super Admin (Admin)"
     },
     {
       "clientId": "1770821879636.0073",
@@ -4956,17 +4963,7 @@
       ]
     }
   ],
-  "routers": [
-    {
-      "_id": "r1",
-      "name": "Raju Main Router",
-      "username": "1234",
-      "password": "1122",
-      "host": "103.120.221.221",
-      "port": "11255",
-      "createdAt": "2026-02-11T02:08:00.000Z"
-    }
-  ],
+  "routers": [],
   "invoices": [
     {
       "_id": "INV-918171",
@@ -5143,6 +5140,24 @@
       ],
       "discount": 0,
       "createdAt": "2026-02-28T05:29:10.904Z"
+    },
+    {
+      "_id": "SYS-337954-54",
+      "clientId": "1771273314158-385",
+      "clientName": "azaz",
+      "amount": 800,
+      "type": "Monthly Bill",
+      "status": "Pending",
+      "createdAt": "2026-03-06T13:22:17.954Z"
+    },
+    {
+      "_id": "SYS-337954-46",
+      "clientId": "1771420602638-864",
+      "clientName": "AZAZ AHMAD SWAPNIL",
+      "amount": 100,
+      "type": "Monthly Bill",
+      "status": "Pending",
+      "createdAt": "2026-03-06T13:22:17.954Z"
     }
   ],
   "packages": [],
@@ -5315,6 +5330,16 @@
       "action": "UPDATE",
       "_id": "1772614334253",
       "createdAt": "2026-03-04T08:52:14.253Z"
+    },
+    {
+      "description": "Generated batch invoices for 2 clients",
+      "module": "billing",
+      "ipAddress": "::1",
+      "userName": "Super Admin",
+      "userRole": "Admin",
+      "action": "BATCH",
+      "_id": "1772803338000",
+      "createdAt": "2026-03-06T13:22:18.000Z"
     }
   ]
 }

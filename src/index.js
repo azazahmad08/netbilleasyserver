@@ -65,9 +65,11 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['SuperAdmin', 'Admin', 'Reseller', 'Staff'], default: 'Reseller' },
+    role: { type: String, enum: ['SuperAdmin', 'Admin', 'Reseller', 'SubReseller', 'Staff'], default: 'Reseller' },
     balance: { type: Number, default: 0 },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+    permissions: { type: [String], default: [] },
+    parentId: { type: String }
 }, { timestamps: true });
 
 let Client, Invoice, Package, Ticket, User;
@@ -81,20 +83,39 @@ if (process.env.USE_MONGODB === 'true') {
 
 // --- DATABASE UTILITIES (JSON MODE) ---
 const getDb = () => {
+    const defaultData = {
+        clients: [],
+        tickets: [],
+        invoices: [],
+        packages: [],
+        routers: [],
+        users: [{ _id: 'admin-1', name: 'Super Admin', username: 'admin', password: 'admin', role: 'SuperAdmin', status: 'Active', permissions: ['All Permission'] }],
+        logs: [],
+        areas: []
+    };
     if (!fs.existsSync(DB_FILE)) {
-        fs.writeFileSync(DB_FILE, JSON.stringify({ clients: [], tickets: [], invoices: [], packages: [], routers: [], users: [], logs: [], areas: [] }));
+        fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
     }
     const db = JSON.parse(fs.readFileSync(DB_FILE));
-    if (!db.logs) db.logs = [];
-    if (!db.areas) db.areas = [];
+
+    // Ensure all keys exist
+    Object.keys(defaultData).forEach(key => {
+        if (!db[key]) db[key] = defaultData[key];
+    });
+
+    // Bootstrap if no users exist
+    if (!db.users || db.users.length === 0) {
+        db.users = defaultData.users;
+        fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+    }
     return db;
 };
 
 const saveDb = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 
 const db = {
-    findAllClients: async () => getDb().clients,
-    findClientById: async (id) => getDb().clients.find(c => c._id === id),
+    findAllClients: async () => getDb().clients || [],
+    findClientById: async (id) => (getDb().clients || []).find(c => c._id === id),
     createClient: async (data, creatorId = null) => {
         const d = getDb();
         const newClient = { ...data, _id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`, resellerId: creatorId, createdAt: new Date() };
@@ -143,7 +164,8 @@ const db = {
     },
     findAllTickets: async () => {
         const d = getDb();
-        return (d.tickets || []).map(t => ({ ...t, clientId: d.clients.find(c => c._id === t.clientId) || { name: 'Unknown' } }));
+        const clients = d.clients || [];
+        return (d.tickets || []).map(t => ({ ...t, clientId: clients.find(c => c._id === t.clientId) || { name: 'Unknown' } }));
     },
     createTicket: async (data) => {
         const d = getDb();
@@ -157,6 +179,22 @@ const db = {
         const idx = d.tickets.findIndex(t => t._id === id);
         if (idx === -1) return null;
         d.tickets[idx] = { ...d.tickets[idx], ...data };
+        saveDb(d);
+        return d.tickets[idx];
+    },
+    deleteTicket: async (id) => {
+        const d = getDb();
+        d.tickets = (d.tickets || []).filter(t => t._id !== id);
+        saveDb(d);
+        return true;
+    },
+    addTicketComment: async (id, commentData) => {
+        const d = getDb();
+        const idx = d.tickets?.findIndex(t => t._id === id);
+        if (idx === -1) return null;
+        if (!d.tickets[idx].comments) d.tickets[idx].comments = [];
+        const newComment = { ...commentData, date: new Date() };
+        d.tickets[idx].comments.push(newComment);
         saveDb(d);
         return d.tickets[idx];
     },
@@ -194,6 +232,39 @@ const db = {
     },
     findAllInvoices: async () => getDb().invoices || [],
     findInvoicesByClient: async (clientId) => (getDb().invoices || []).filter(inv => inv.clientId === clientId),
+    findClientsWithDue: async () => {
+        const d = getDb();
+        return (d.clients || []).filter(c => Number(c.balance || 0) > 0);
+    },
+    batchGenerateInvoices: async (month) => {
+        const d = getDb();
+        const activeClients = (d.clients || []).filter(c => c.status === 'Active');
+        let count = 0;
+        for (const c of activeClients) {
+            const bill = Number(c.bill || 0);
+            if (bill > 0) {
+                const cIdx = d.clients.findIndex(cli => cli._id === c._id);
+                d.clients[cIdx].balance = (Number(d.clients[cIdx].balance) || 0) + bill;
+                const newInv = {
+                    _id: 'SYS-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 100),
+                    clientId: c._id,
+                    clientName: c.name,
+                    amount: bill,
+                    type: 'Monthly Bill',
+                    status: 'Pending',
+                    clientBalance: d.clients[cIdx].balance,
+                    monthly: bill,
+                    createdAt: new Date()
+                };
+                if (!d.invoices) d.invoices = [];
+                d.invoices.push(newInv);
+                count++;
+            }
+        }
+        saveDb(d);
+        return count;
+    },
+
     rechargeClient: async (id, data) => {
         const d = getDb();
         const idx = d.clients.findIndex(c => c._id === id);
@@ -219,7 +290,7 @@ const db = {
             newDate.setMonth(newDate.getMonth() + 1);
         }
         d.clients[idx].date = newDate.toISOString().split('T')[0];
-        const newInvoice = { _id: 'INV-' + Date.now().toString().slice(-6), clientId: id, clientName: d.clients[idx].name, amount: finalAmount, type: data.billType || 'Bill', billingType: data.billingType || 'Monthly', days: data.billingType === 'Daily' ? data.days : 0, medium: data.rechargedBy ? 'Wallet' : (data.medium || 'Hand Cash'), rechargedBy: data.rechargedBy || 'Admin', months: data.months || [], discount: discount, createdAt: new Date() };
+        const newInvoice = { _id: 'INV-' + Date.now().toString().slice(-6), clientId: id, clientName: d.clients[idx].name, amount: finalAmount, type: data.billType || 'Bill', billingType: data.billingType || 'Monthly', days: data.billingType === 'Daily' ? data.days : 0, medium: data.rechargedBy ? 'Wallet' : (data.medium || 'Hand Cash'), rechargedBy: data.rechargedBy || 'Admin', months: data.months || [], discount: discount, clientBalance: d.clients[idx].balance, monthly: d.clients[idx].price || d.clients[idx].bill || 0, createdAt: new Date() };
         if (!d.invoices) d.invoices = [];
         d.invoices.push(newInvoice);
         saveDb(d);
@@ -519,19 +590,57 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const username = req.body.username?.trim();
         const password = req.body.password?.trim();
-        if (username === '01316124535' && password === 'azaz0011') {
-            return res.json({ success: true, user: { _id: '1772574954742', role: 'Reseller', name: 'AZAZ AHMAD SWAPNIL' } });
-        }
+
+        // 2. Check System Users (Admin, Reseller, Staff) from Database
         const users = await db.findAllUsers();
-        const user = users.find(u => ((u.username === username || u.phone === username || u.mobile === username || u.name === username || u._id === username) && u.password === password));
-        if (!user) {
-            if (username === 'admin' && password === 'admin') return res.json({ success: true, user: { _id: 'admin-1', role: 'Admin', name: 'Super Admin' } });
-            if (username === 'manager' && password === 'manager') return res.json({ success: true, user: { _id: 'manager-1', role: 'Manager', name: 'Fallback Manager' } });
-            return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+        let user = users.find(u => (
+            (u.username === username || u.phone === username || u.mobile === username || u._id === username) &&
+            u.password === password
+        ));
+
+        if (user) {
+            if (user.status === 'Inactive') return res.status(403).json({ success: false, message: 'Account is inactive' });
+            return res.json({
+                success: true,
+                user: {
+                    _id: user._id,
+                    role: user.role,
+                    name: user.name,
+                    permissions: user.permissions || [],
+                    parentId: user.parentId,
+                    balance: user.balance || 0
+                }
+            });
         }
-        if (user.status === 'Inactive') return res.status(403).json({ success: false, message: 'Account is inactive' });
-        res.json({ success: true, user: { _id: user._id, role: user.role, name: user.name, permissions: user.permissions || [], parentId: user.parentId } });
-    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+
+        // 3. Check Clients (Regular User/Customer)
+        const clients = await db.findAllClients();
+        const client = clients.find(c => (
+            (c.username === username || c.phone === username || c.pppoeName === username || c.customerId === username) &&
+            c.password === password
+        ));
+
+        if (client) {
+            if (client.status === 'Inactive') return res.status(403).json({ success: false, message: 'Your internet account is inactive. Please contact support.' });
+            return res.json({
+                success: true,
+                user: {
+                    _id: client._id,
+                    role: 'User',
+                    name: client.name,
+                    username: client.username,
+                    package: client.package,
+                    balance: client.balance || 0,
+                    expiryDate: client.date,
+                    phone: client.phone
+                }
+            });
+        }
+
+        return res.status(401).json({ success: false, message: 'Invalid credentials. Please check your username/phone and password.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // Clients
@@ -539,24 +648,87 @@ app.get('/api/clients', async (req, res) => {
     try {
         const userId = req.headers['x-user-id'];
         const user = await db.findUserById(userId);
-        let clients = await db.findAllClients();
-        if (user && user.role === 'Reseller') clients = clients.filter(c => c.resellerId === userId);
-        res.json(clients);
+        const dbClients = await db.findAllClients();
+        const routers = await db.findAllRouters(userId);
+
+        let allSecrets = [];
+        for (const r of routers) {
+            try {
+                const { client, api } = await connectRouter(r);
+                const secrets = await api.menu('/ppp/secret').get();
+                allSecrets = allSecrets.concat(secrets.map(s => ({
+                    ...s,
+                    routerId: r._id,
+                    routerName: r.name
+                })));
+                await client.close();
+            } catch (err) {
+                console.error(`Client sync skipped for ${r.name}: Router offline`);
+            }
+        }
+
+        // Map secrets to DB clients
+        const enrichedClients = allSecrets.map(s => {
+            const dbClient = dbClients.find(c => c.username === s.name || c.pppoeName === s.name);
+            return {
+                _id: dbClient?._id || `mt-${s[".id"]}`,
+                name: dbClient?.name || s.comment || s.name,
+                username: s.name,
+                password: s.password,
+                package: s.profile,
+                status: s.disabled === 'true' ? 'Inactive' : 'Active',
+                balance: dbClient?.balance || 0,
+                bill: dbClient?.price || dbClient?.bill || 0,
+                date: dbClient?.date || dbClient?.createdAt || '',
+                phone: dbClient?.phone || '',
+                mikrotik: s.routerId,
+                routerName: s.routerName,
+                isAutoImported: !dbClient
+            };
+        });
+
+        let filtered = enrichedClients;
+        if (user && user.role === 'Reseller') {
+            // Further filter if reseller is implemented
+        }
+
+        res.json(filtered);
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 app.get('/api/clients/stats', async (req, res) => {
     try {
-        const clients = await db.findAllClients();
+        const routers = await db.findAllRouters(req.headers['x-user-id']);
         const invoices = await db.findAllInvoices();
-        const routers = await db.findAllRouters();
+        const dbClients = await db.findAllClients();
+
+        let totalSecrets = 0;
+        let activeSecrets = 0;
+        let activeSessions = 0;
+
+        for (const r of routers) {
+            try {
+                const { client, api } = await connectRouter(r);
+                const secrets = await api.menu('/ppp/secret').get();
+                const active = await api.menu('/ppp/active').get();
+
+                totalSecrets += secrets.length;
+                activeSecrets += secrets.filter(s => s.disabled === 'false').length;
+                activeSessions += active.length;
+                await client.close();
+            } catch (err) {
+                console.error(`Router stats failed for ${r.name}: ${err.message}`);
+            }
+        }
+
         const stats = {
-            totalClients: clients.length,
-            activeClients: clients.filter(c => c.status === 'Active').length,
-            inactiveClients: clients.filter(c => c.status !== 'Active').length,
-            totalDue: clients.reduce((acc, c) => acc + (Number(c.balance || 0) > 0 ? Number(c.balance) : 0), 0),
-            expectedMonthly: clients.filter(c => c.status === 'Active').reduce((acc, c) => acc + Number(c.bill || 0), 0),
+            totalClients: totalSecrets,
+            activeClients: activeSecrets,
+            inactiveClients: totalSecrets - activeSecrets,
+            totalDue: dbClients.reduce((acc, c) => acc + (Number(c.balance || 0) > 0 ? Number(c.balance) : 0), 0),
+            expectedMonthly: dbClients.filter(c => c.status === 'Active').reduce((acc, c) => acc + Number(c.bill || 0), 0),
             totalCollection: invoices.reduce((acc, inv) => acc + Number(inv.amount || 0), 0),
-            totalRouters: routers.length
+            totalRouters: routers.length,
+            onlineSessions: activeSessions
         };
         res.json(stats);
     } catch (e) { res.status(500).json({ message: e.message }); }
@@ -568,6 +740,12 @@ app.get('/api/clients/invoices', async (req, res) => {
         const clientMap = clients.reduce((acc, c) => { acc[c._id] = c; return acc; }, {});
         const enriched = invoices.map(inv => ({ ...inv, clientUsername: clientMap[inv.clientId]?.username || 'N/A', clientName: clientMap[inv.clientId]?.name || inv.clientName || 'Unknown' }));
         res.json(enriched.reverse());
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+app.get('/api/clients/:id/invoices', async (req, res) => {
+    try {
+        const invoices = await db.findInvoicesByClient(req.params.id);
+        res.json(invoices.reverse());
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 app.post('/api/clients', async (req, res) => {
@@ -587,12 +765,83 @@ app.post('/api/clients/:id/recharge', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+app.put('/api/clients/:id', async (req, res) => {
+    try {
+        const oldClient = (await db.findAllClients()).find(c => c._id === req.params.id);
+        const client = await db.updateClient(req.params.id, req.body);
+        if (client && client.mikrotik) {
+            await mikrotikController.updateSecret(client.mikrotik, oldClient.pppoeName || oldClient.username, {
+                name: client.pppoeName || client.username,
+                password: client.password,
+                profile: client.package,
+                comment: `ID: ${client.customerId || ''}, Name: ${client.name || ''}`
+            });
+        }
+        await logActivity(req, { description: `Updated customer: ${client.name}`, module: 'customer', action: 'UPDATE' });
+        res.json(client);
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.delete('/api/clients/:id', async (req, res) => {
+    try {
+        const client = (await db.findAllClients()).find(c => c._id === req.params.id);
+        if (client && client.mikrotik) {
+            await mikrotikController.deleteSecret(client.mikrotik, client.pppoeName || client.username);
+        }
+        await db.deleteClient(req.params.id);
+        await logActivity(req, { description: `Deleted customer: ${client ? client.name : req.params.id}`, module: 'customer', action: 'DELETE' });
+        res.json({ message: 'Client deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 // Mikrotik
 app.get('/api/mikrotik', async (req, res) => { res.json(await db.findAllRouters(req.headers['x-user-id'])); });
 app.get('/api/mikrotik/stats', async (req, res) => {
-    const routers = await db.findAllRouters(req.headers['x-user-id']);
-    res.json({ totalRouters: routers.length, onlineRouters: routers.length }); // Simplified stats
+    try {
+        const routers = await db.findAllRouters(req.headers['x-user-id']);
+        let onlineRouters = 0;
+        let totalSecrets = 0;
+        let activeUsers = 0;
+
+        for (const r of routers) {
+            try {
+                const { client, api } = await connectRouter(r);
+                onlineRouters++;
+                const secrets = await api.menu('/ppp/secret').get();
+                const active = await api.menu('/ppp/active').get();
+                totalSecrets += secrets.length;
+                activeUsers += active.length;
+                await client.close();
+            } catch (err) {
+                console.error(`Router ${r.name} stats fetch failed: ${err.message}`);
+            }
+        }
+
+        res.json({
+            totalRouters: routers.length,
+            onlineRouters,
+            totalSecrets,
+            activeUsers,
+            offlineUsers: totalSecrets - activeUsers
+        });
+    } catch (e) { res.status(500).json({ message: e.message }); }
 });
+app.get('/api/mikrotik/active', async (req, res) => {
+    try {
+        const routers = await db.findAllRouters(req.headers['x-user-id']);
+        let allActive = [];
+        for (const r of routers) {
+            try {
+                const { client, api } = await connectRouter(r);
+                const active = await api.menu('/ppp/active').get();
+                allActive = allActive.concat(active.map(a => ({ ...a, routerName: r.name })));
+                await client.close();
+            } catch (err) { console.error(`Failed to fetch active users from ${r.name}`); }
+        }
+        res.json(allActive);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 app.get('/api/mikrotik/:id/ping', async (req, res) => {
     try {
         const r = await db.findRouterById(req.params.id);
@@ -601,15 +850,240 @@ app.get('/api/mikrotik/:id/ping', async (req, res) => {
         res.json({ status: 'Online' });
     } catch (e) { res.json({ status: 'Offline', message: e.message }); }
 });
+app.post('/api/mikrotik', async (req, res) => {
+    try {
+        const router = await db.createRouter(req.body, req.headers['x-user-id']);
+        res.status(201).json(router);
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+app.get('/api/mikrotik/:id', async (req, res) => {
+    const router = await db.findRouterById(req.params.id);
+    router ? res.json(router) : res.status(404).json({ message: 'Router not found' });
+});
+app.put('/api/mikrotik/:id', async (req, res) => {
+    try {
+        const router = await db.updateRouter(req.params.id, req.body);
+        router ? res.json(router) : res.status(404).json({ message: 'Router not found' });
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+app.delete('/api/mikrotik/:id', async (req, res) => {
+    await db.deleteRouter(req.params.id);
+    res.json({ message: 'Router deleted' });
+});
+app.get('/api/mikrotik/:id/secrets', async (req, res) => {
+    try {
+        const router = await db.findRouterById(req.params.id);
+        const { client, api } = await connectRouter(router);
+        const secrets = await api.menu('/ppp/secret').get();
+        await client.close();
+        res.json(secrets);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+app.get('/api/mikrotik/:id/profiles', async (req, res) => {
+    try {
+        const router = await db.findRouterById(req.params.id);
+        const { client, api } = await connectRouter(router);
+        const profiles = await api.menu('/ppp/profile').get();
+        await client.close();
+        res.json(profiles);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+app.post('/api/mikrotik/:id/import-secrets', async (req, res) => {
+    try {
+        const router = await db.findRouterById(req.params.id);
+        const { client, api } = await connectRouter(router);
+        const secrets = await api.menu('/ppp/secret').get();
+        await client.close();
+        const clientsToImport = secrets.map(s => ({
+            name: String(s.comment || s.name),
+            username: s.name,
+            phone: (s.comment?.match(/\d{11}/) || ['00000000000'])[0],
+            package: s.profile,
+            zone: 'Imported',
+            mikrotik: req.params.id
+        }));
+        const imported = await db.bulkCreateClients(clientsToImport);
+        res.json({ message: 'Import successful', total: secrets.length, imported: imported.length });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+app.get('/api/mikrotik/:id/history', async (req, res) => {
+    try {
+        const router = await db.findRouterById(req.params.id);
+        const { client, api } = await connectRouter(router);
+        const resources = await api.menu('/system/resource').get();
+        await client.close();
+        res.json(resources[0] || {});
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+app.get('/api/mikrotik/:id/monitor', async (req, res) => {
+    try {
+        const router = await db.findRouterById(req.params.id);
+        const { client, api } = await connectRouter(router);
+        const interfaceName = req.query.interface || 'ether1';
+        // Note: routeros-client's monitor traffic might be complex. This is a simplified version.
+        const stats = await api.write(['/interface/monitor-traffic', '=interface=' + interfaceName, '=once=']);
+        await client.close();
+        res.json(stats);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+
 
 // Users
 app.get('/api/users', async (req, res) => res.json(await db.findAllUsers(true)));
 app.get('/api/users/me', async (req, res) => res.json(await db.findUserById(req.headers['x-user-id'] || 'admin-1')));
 app.post('/api/users', async (req, res) => res.status(201).json(await db.createUser(req.body, req.headers['x-user-id'])));
+app.get('/api/users/:id', async (req, res) => {
+    const user = await db.findUserById(req.params.id);
+    user ? res.json(user) : res.status(404).json({ message: 'User not found' });
+});
+app.put('/api/users/:id', async (req, res) => {
+    const user = await db.updateUser(req.params.id, req.body);
+    user ? res.json(user) : res.status(404).json({ message: 'User not found' });
+});
+app.delete('/api/users/:id', async (req, res) => {
+    await db.deleteUser(req.params.id);
+    res.status(204).send();
+});
+app.post('/api/users/:id/add-balance', async (req, res) => {
+    try {
+        const user = await db.addResellerBalance(req.params.id, req.body.amount, req.headers['x-user-id']);
+        user ? res.json(user) : res.status(404).json({ message: 'User not found' });
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
 
 // SMS
 app.get('/api/sms/balance', async (req, res) => res.json(await checkSMSBalance()));
 app.post('/api/sms/send-manual', async (req, res) => res.json(await sendSMS(req.body.number, req.body.message)));
+app.post('/api/sms/send-bulk', async (req, res) => res.json(await sendBulkSMS(req.body.messages)));
+app.post('/api/sms/send-client', async (req, res) => {
+    try {
+        const client = (await db.findAllClients()).find(c => c._id === req.body.clientId);
+        if (client && client.phone) {
+            const result = await sendSMS(client.phone, req.body.message);
+            res.json(result);
+        } else {
+            res.status(404).json({ message: 'Client or phone not found' });
+        }
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Billing/Accounts
+app.get('/api/billing/stats', async (req, res) => {
+    try {
+        const clients = await db.findAllClients();
+        const invoices = await db.findAllInvoices();
+        const stats = {
+            totalCollected: invoices.filter(i => i.type === 'Bill' || !i.status || i.status === 'Paid').reduce((acc, i) => acc + Number(i.amount || 0), 0),
+            pendingDues: clients.reduce((acc, c) => acc + (Number(c.balance || 0) > 0 ? Number(c.balance) : 0), 0),
+            dueClientsCount: clients.filter(c => Number(c.balance || 0) > 0).length,
+            targetRevenue: clients.reduce((acc, c) => acc + Number(c.bill || 0), 0)
+        };
+        res.json(stats);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/billing/generate-batch', async (req, res) => {
+    try {
+        const count = await db.batchGenerateInvoices(req.body.month);
+        await logActivity(req, { description: `Generated batch invoices for ${count} clients`, module: 'billing', action: 'BATCH' });
+        res.json({ success: true, count });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/billing/broadcast-sms', async (req, res) => {
+    try {
+        const dueClients = await db.findClientsWithDue();
+        const messages = dueClients.filter(c => c.phone && c.phone.length >= 11).map(c => ({
+            to: c.phone,
+            message: req.body.template.replace('{name}', c.name).replace('{balance}', c.balance).replace('{id}', c.customerId || c.username)
+        }));
+        if (messages.length === 0) return res.json({ success: true, sent: 0, message: 'No clients with due found' });
+        const result = await sendBulkSMS(messages);
+        await logActivity(req, { description: `Broadcasted SMS to ${messages.length} clients`, module: 'sms', action: 'BROADCAST' });
+        res.json({ success: true, sent: messages.length, providerResponse: result });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+
+// Areas & Zones
+app.get('/api/areas', async (req, res) => res.json(await db.findAllAreas()));
+app.post('/api/areas', async (req, res) => {
+    try {
+        const area = await db.createArea(req.body);
+        await logActivity(req, { description: `Created Area: ${area.name}`, module: 'area', action: 'CREATE' });
+        res.status(201).json(area);
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+app.delete('/api/areas/:id', async (req, res) => {
+    await db.deleteArea(req.params.id);
+    res.status(204).send();
+});
+app.post('/api/areas/:id/subareas', async (req, res) => {
+    try {
+        const subArea = await db.createSubArea(req.params.id, req.body);
+        res.status(201).json(subArea);
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+// Tickets
+app.get('/api/tickets', async (req, res) => {
+    try {
+        const userId = req.headers['x-user-id'];
+        const user = await db.findUserById(userId);
+        let tickets = await db.findAllTickets();
+
+        // If it's a regular Customer (User), show only their tickets
+        if (!user) {
+            const clients = await db.findAllClients();
+            const client = clients.find(c => c._id === userId);
+            if (client) {
+                tickets = tickets.filter(t => t.clientId?._id === userId || t.clientId === userId);
+            }
+        } else if (user.role === 'Reseller' || user.role === 'SubReseller') {
+            // Future: filter by reseller's clients
+        }
+
+        res.json(tickets);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/tickets', async (req, res) => {
+    try {
+        const userId = req.headers['x-user-id'];
+        const user = await db.findUserById(userId);
+        let ticketData = { ...req.body };
+
+        // If User/Customer is creating the ticket, force their clientId
+        if (!user) {
+            ticketData.clientId = userId;
+        }
+
+        const ticket = await db.createTicket(ticketData);
+        await logActivity(req, { description: `Raised support ticket: ${ticket.subject}`, module: 'support', action: 'CREATE' });
+        res.status(201).json(ticket);
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.put('/api/tickets/:id', async (req, res) => {
+    try {
+        const ticket = await db.updateTicket(req.params.id, req.body);
+        ticket ? res.json(ticket) : res.status(404).json({ message: 'Ticket not found' });
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.delete('/api/tickets/:id', async (req, res) => {
+    await db.deleteTicket(req.params.id);
+    res.status(204).send();
+});
+
+app.post('/api/tickets/:id/comments', async (req, res) => {
+    try {
+        const ticket = await db.addTicketComment(req.params.id, req.body);
+        ticket ? res.json(ticket) : res.status(404).json({ message: 'Ticket not found' });
+    } catch (e) { res.status(400).json({ message: e.message }); }
+});
 
 // Logs
 app.get('/api/logs', async (req, res) => res.json((await db.findAllLogs()).reverse()));
